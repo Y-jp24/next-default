@@ -19,6 +19,23 @@ export default function CallPage() {
       .catch(err => console.error('Token取得エラー:', err));
   }, []);
 
+  // 既存参加者のトラックをアタッチするヘルパー関数
+  const attachParticipantTracks = (participant: any) => {
+    // 既に発行されているトラックを処理
+    participant.tracks.forEach((publication: any) => {
+      if (publication.isSubscribed) {
+        const audioTrack = publication.track;
+        const audioElement = audioTrack.attach();
+        document.getElementById('remoteAudio')?.appendChild(audioElement);
+      }
+    });
+    // 新たに公開されたトラックにも対応
+    participant.on('trackSubscribed', (track: any) => {
+      const audioElement = track.attach();
+      document.getElementById('remoteAudio')?.appendChild(audioElement);
+    });
+  };
+
   // 通話参加ハンドラー
   const handleJoinCall = async () => {
     if (!token) return;
@@ -31,24 +48,16 @@ export default function CallPage() {
       setRoom(room);
       console.log(`Room ${room.name} に参加しました`);
 
-      // 既に参加しているリモート参加者のトラックを表示
-      room.participants.forEach((participant:any) => {
-        participant.tracks.forEach((publication:any) => {
-          if (publication.isSubscribed) {
-            const audioTrack = publication.track;
-            const audioElement = audioTrack.attach();
-            document.getElementById('remoteAudio')?.appendChild(audioElement);
-          }
-        });
+      // 既に参加しているリモート参加者のトラックを表示＆イベントリスン設定
+      room.participants.forEach((participant: any) => {
+        console.log('既存参加者:', participant.identity);
+        attachParticipantTracks(participant);
       });
 
-      // 新規参加者のトラックイベントをリッスン
-      room.on('participantConnected', (participant:any) => {
+      // 新規参加者が入室したとき
+      room.on('participantConnected', (participant: any) => {
         console.log('新規参加者:', participant.identity);
-        participant.on('trackSubscribed', (track:any) => {
-          const audioElement = track.attach();
-          document.getElementById('remoteAudio')?.appendChild(audioElement);
-        });
+        attachParticipantTracks(participant);
       });
     } catch (error) {
       console.error("通話参加エラー:", error);
