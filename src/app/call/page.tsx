@@ -30,7 +30,9 @@ export default function CallPage() {
       console.log(`Room ${room.name} に参加しました`);
 
       // 既に参加しているリモート参加者のトラックを表示
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       room.participants.forEach((participant:any) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         participant.tracks.forEach((publication:any) => {
           if (publication.isSubscribed) {
             const audioTrack = publication.track;
@@ -41,8 +43,10 @@ export default function CallPage() {
       });
 
       // 新規参加者のトラックイベントをリッスン
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       room.on('participantConnected', (participant:any) => {
         console.log('新規参加者:', participant.identity);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         participant.on('trackSubscribed', (track:any) => {
           const audioElement = track.attach();
           document.getElementById('remoteAudio')?.appendChild(audioElement);

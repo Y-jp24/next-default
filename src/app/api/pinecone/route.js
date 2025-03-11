@@ -4,7 +4,7 @@ import OpenAI from 'openai';
 
 // 環境変数から取得
 const PINECONE_API_KEY = process.env.PINECONE_API_KEY;
-const PINECONE_ENVIRONMENT = process.env.PINECONE_ENVIRONMENT;
+// const PINECONE_ENVIRONMENT = process.env.PINECONE_ENVIRONMENT;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const PINECONE_INDEX_NAME = 'my-index'; // 事前に作成済みのインデックス
 
