@@ -114,7 +114,7 @@ export default function CallPage() {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Twilio Audio Call改</h1>
+      <h1 className="text-2xl font-bold mb-4">Twilio Audio Call改2</h1>
       <p className="mb-4">状態: {connectionStatus}</p>
       <div className="flex space-x-4 mb-4">
         <button
