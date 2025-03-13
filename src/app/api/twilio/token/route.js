@@ -3,23 +3,29 @@ import { NextResponse } from 'next/server';
 import twilio from 'twilio';
 
 export async function GET(request) {
-  const { searchParams } = new URL(request.url);
-  // ユーザー識別子をクエリから取得（なければ "anonymous" とする）
-  const identity = searchParams.get('identity') || 'anonymous';
-  // ルーム名（指定がなければ"default-room"）
-  const roomName = searchParams.get('room') || 'default-room';
+  try {
+    const { searchParams } = new URL(request.url);
+    const identity = searchParams.get('identity') || 'anonymous';
+    const roomName = searchParams.get('room') || 'default-room';
 
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const apiKey = process.env.TWILIO_API_KEY;
-  const apiSecret = process.env.TWILIO_API_SECRET;
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const apiKey = process.env.TWILIO_API_KEY;
+    const apiSecret = process.env.TWILIO_API_SECRET;
 
-  const AccessToken = twilio.jwt.AccessToken;
-  const VideoGrant = AccessToken.VideoGrant;
+    if (!accountSid || !apiKey || !apiSecret) {
+      throw new Error('Twilioの環境変数が正しく設定されていません。');
+    }
 
-  // アクセストークンを作成（この例ではVideoGrantを使用しますが、audio通話のみの場合でも同様）
-  const token = new AccessToken(accountSid, apiKey, apiSecret, { identity });
-  const videoGrant = new VideoGrant({ room: roomName });
-  token.addGrant(videoGrant);
+    const AccessToken = twilio.jwt.AccessToken;
+    const VideoGrant = AccessToken.VideoGrant;
 
-  return NextResponse.json({ token: token.toJwt() });
+    const token = new AccessToken(accountSid, apiKey, apiSecret, { identity });
+    const videoGrant = new VideoGrant({ room: roomName });
+    token.addGrant(videoGrant);
+
+    return NextResponse.json({ token: token.toJwt() });
+  } catch (error) {
+    console.error('トークン生成エラー:', error);
+    return NextResponse.error();
+  }
 }

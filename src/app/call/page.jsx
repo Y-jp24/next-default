@@ -6,10 +6,12 @@ import { connect, createLocalTracks } from 'twilio-video';
 export default function CallPage() {
   const [room, setRoom] = useState(null);
   const [token, setToken] = useState('');
+  const [connectionStatus, setConnectionStatus] = useState('未接続');
+  const [remoteParticipants, setRemoteParticipants] = useState([]);
   const localMediaRef = useRef(null);
   const remoteMediaRef = useRef(null);
 
-  // 初回レンダリング時にAccess Tokenを取得（ランダムなidentityを使用）
+  // ページ読み込み時にトークンを取得（identityはランダムな値を利用）
   useEffect(() => {
     async function fetchToken() {
       const identity = Math.random().toString(36).substring(2);
@@ -20,19 +22,18 @@ export default function CallPage() {
     fetchToken();
   }, []);
 
-  // ルームに参加する関数
   const joinRoom = async () => {
     if (!token) return;
-
-    // 音声のみのローカルトラックを作成
+    setConnectionStatus('接続中...');
     const localTracks = await createLocalTracks({ audio: true, video: false });
     const room = await connect(token, {
       name: 'my-audio-room',
       tracks: localTracks,
     });
     setRoom(room);
+    setConnectionStatus(`入室中: ${room.name}`);
 
-    // （音声は通常ビジュアルコンポーネントが不要ですが、場合に応じてDOMにattachできます）
+    // ローカルの音声トラックをDOMに追加
     localTracks.forEach(track => {
       if (track.kind === 'audio') {
         const audioElem = track.attach();
@@ -41,65 +42,105 @@ export default function CallPage() {
       }
     });
 
-    // 既存の参加者の音声トラックを表示（attach()でaudio要素を生成）
+    // 既に入室している参加者の情報をセット
+    const initialParticipants = [];
     room.participants.forEach(participant => {
+      initialParticipants.push({ id: participant.sid, identity: participant.identity, status: '入室中' });
       participant.tracks.forEach(publication => {
         if (publication.track) {
           const audioElem = publication.track.attach();
           remoteMediaRef.current.appendChild(audioElem);
         }
       });
-      // 新たな参加者が接続した場合
+      participant.on('trackSubscribed', track => {
+        const audioElem = track.attach();
+        remoteMediaRef.current.appendChild(audioElem);
+      });
+    });
+    setRemoteParticipants(initialParticipants);
+
+    // 新たな参加者の入室イベント
+    room.on('participantConnected', participant => {
+      setRemoteParticipants(prev => [
+        ...prev,
+        { id: participant.sid, identity: participant.identity, status: '入室中' },
+      ]);
+      participant.tracks.forEach(publication => {
+        if (publication.track) {
+          const audioElem = publication.track.attach();
+          remoteMediaRef.current.appendChild(audioElem);
+        }
+      });
       participant.on('trackSubscribed', track => {
         const audioElem = track.attach();
         remoteMediaRef.current.appendChild(audioElem);
       });
     });
 
-    // 新規参加者の接続時イベント
-    room.on('participantConnected', participant => {
-      participant.tracks.forEach(publication => {
-        if (publication.track) {
-          const audioElem = publication.track.attach();
-          remoteMediaRef.current.appendChild(audioElem);
-        }
+    // 参加者の退室イベント
+    room.on('participantDisconnected', participant => {
+      setRemoteParticipants(prev => prev.filter(p => p.id !== participant.sid));
+      // リモートメディアのDOMを再描画
+      remoteMediaRef.current.innerHTML = '';
+      room.participants.forEach(p => {
+        p.tracks.forEach(publication => {
+          if (publication.track) {
+            const audioElem = publication.track.attach();
+            remoteMediaRef.current.appendChild(audioElem);
+          }
+        });
       });
-      participant.on('trackSubscribed', track => {
-        const audioElem = track.attach();
-        remoteMediaRef.current.appendChild(audioElem);
-      });
+    });
+
+    // ローカル参加者が退室したときのイベント
+    room.on('disconnected', () => {
+      setConnectionStatus('退室済み');
+      setRoom(null);
+      setRemoteParticipants([]);
+      localMediaRef.current.innerHTML = '';
+      remoteMediaRef.current.innerHTML = '';
     });
   };
 
-  // ルームから退出する関数
   const leaveRoom = () => {
     if (room) {
+      // 退室前にローカルの各トラックを停止（マイクの動作を停止）
+      room.localParticipant.tracks.forEach(publication => {
+        publication.track.stop();
+      });
       room.disconnect();
-      setRoom(null);
-      // DOMをクリーンアップ
-      if (localMediaRef.current) localMediaRef.current.innerHTML = '';
-      if (remoteMediaRef.current) remoteMediaRef.current.innerHTML = '';
     }
   };
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Twilio Audio Call</h1>
+      <h1 className="text-2xl font-bold mb-4">Twilio Audio Call改</h1>
+      <p className="mb-4">状態: {connectionStatus}</p>
       <div className="flex space-x-4 mb-4">
         <button
           onClick={joinRoom}
           className="bg-blue-500 text-white px-4 py-2 rounded"
           disabled={room !== null}
         >
-          Join Room
+          入室
         </button>
         <button
           onClick={leaveRoom}
           className="bg-red-500 text-white px-4 py-2 rounded"
           disabled={room === null}
         >
-          Leave Room
+          退室
         </button>
+      </div>
+      <div className="mb-4">
+        <h2 className="font-bold">リモート参加者:</h2>
+        <ul>
+          {remoteParticipants.map(participant => (
+            <li key={participant.id}>
+              {participant.identity} - {participant.status}
+            </li>
+          ))}
+        </ul>
       </div>
       <div ref={localMediaRef} id="local-media" />
       <div ref={remoteMediaRef} id="remote-media" />
